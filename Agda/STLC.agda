@@ -121,7 +121,14 @@ fvar x (repl Γ e s) >>=ₛ σ = replace Γ (fvar x s >>=ₛ σ) (e >>=ₛ σ)
 
 lift-sucExp : ∀{s s' u t}{X Y : VarSet}{Γ' : Cxt s'} → (Γ : Cxt s) → (σ : X ⇀ₛ Y) → 
           (e : Exp X (Γ ++ Γ') t) → (sucExp {u = u} Γ e >>=ₛ σ) ≡ sucExp Γ (e >>=ₛ σ)
-lift-sucExp Γ σ e = {!!}
+lift-sucExp Γ σ unit = refl
+lift-sucExp Γ σ (inL e) = cong inL (lift-sucExp Γ σ e)
+lift-sucExp Γ σ (inR e) = cong inR (lift-sucExp Γ σ e)
+lift-sucExp Γ σ (case {u}{v} e e₁ e₂) = cong₃ case (lift-sucExp Γ σ e) 
+                                                   (lift-sucExp (u ∷ Γ) σ e₁) 
+                                                   (lift-sucExp (v ∷ Γ) σ e₂)
+lift-sucExp Γ σ (var v) = refl
+lift-sucExp Γ σ (fvar x s) = refl
 
 
 
@@ -137,9 +144,9 @@ lift-replace Γ σ (case {u}{v} e e₁ e₂) e' = cong₃ case (lift-replace Γ 
 lift-replace [] σ (var (inj₁ refl)) e' = refl
 lift-replace [] σ (var (inj₂ v)) e' = refl
 lift-replace (x ∷ Γ) σ (var (inj₁ eq)) e' = refl
-lift-replace (x ∷ Γ) σ (var (inj₂ v)) e' = let v = lift-replace Γ σ (var v) e' 
-             in {!!} -- lift-sucExp [] σ {!!} 
-lift-replace Γ σ (fvar x x₁) e' = {!!}
+lift-replace (x ∷ Γ) σ (var (inj₂ v)) e' = trans (lift-sucExp [] σ (replace Γ (var v) e')) 
+                                                 (cong (sucExp []) (lift-replace Γ σ (var v) e'))  
+lift-replace Γ σ (fvar x s) e' = refl
 
 
 
