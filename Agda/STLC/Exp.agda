@@ -5,7 +5,6 @@ open import Data.Vec
 open import Data.Nat
 open import Data.Product
 open import Relation.Binary.PropositionalEquality
-open import Data.Unit
 open import Data.Empty
 open import Data.Sum
 
@@ -76,6 +75,10 @@ replace [] (var (inj₂ y)) e' = var y
 replace (t ∷ Γ) (var (inj₁ eq)) e' = var (inj₁ eq)
 replace (x ∷ Γ) (var (inj₂ v)) e'  = sucExp [] (replace Γ (var v) e')
 replace Γ (fvar x s) e' = fvar x (repl Γ e' s) 
+
+_⟨ₛ_⟩ : ∀{n u t}{X : VarSet}{Γ : Cxt n} →  
+          Exp X (u ∷ Γ) t → Exp X Γ u → Exp X Γ t
+e ⟨ₛ e' ⟩ = replace [] e e'
 
 _⇀ₛ_ : VarSet → VarSet → Set
 X ⇀ₛ Y = (∀{m u}{Δ : Cxt m} → X Δ u → Exp Y Δ u)
