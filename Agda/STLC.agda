@@ -16,23 +16,12 @@ data Type : Set where
 Cxt : ℕ → Set
 Cxt n = Vec Type n
 
-Cxt+ : Set
-Cxt+ = ∃ (λ n → Cxt n)
-
 VarSet : Set₁
 VarSet = {n : ℕ} → Cxt n → Type → Set
 
 Var : VarSet
 Var [] t = ⊥
 Var (t ∷ Γ) t₁ = t ≡ t₁ ⊎ Var Γ t₁
-
---data Val {n : ℕ} (X : VarSet) (Γ : Cxt n)  : Type → Set
-
---data _⊆_ : {n n' : ℕ} → (Γ' : Cxt n') → (Γ : Cxt n) → Set where
---  weak : ∀{n}{Γ : Cxt n} → (u : Type) → Γ ⊆ (u ∷ Γ)
---  exchange : ∀{n}{Γ : Cxt n} → (u t : Type) → (u ∷ t ∷ Γ) ⊆ (t ∷ u ∷ Γ)
---  lift : ∀ {u n n'}{Γ : Cxt n}{Γ' : Cxt n'} → Γ ⊆ Γ'
-              --→ (u ∷ Γ) ⊆ (u ∷ Γ')
               
 data Subst (X : VarSet) : {n n' : ℕ} → (Γ : Cxt n) → (Γ' : Cxt n') → Set 
               
@@ -42,7 +31,6 @@ data Exp (X : VarSet) {n : ℕ} (Γ : Cxt n) : (t : Type) → Set where
    inL : ∀{t u} (e : Exp X Γ t) → Exp X Γ (t ⊕ u) 
    inR : ∀{t u} (e : Exp X Γ u) → Exp X Γ (t ⊕ u) 
 
---   val : (a :  X Γ t) → Exp X Γ t
    case : ∀{u v t} → Exp X Γ (u ⊕ v) → 
                     Exp X (u ∷ Γ) t → 
                     Exp X (v ∷ Γ) t → 
@@ -59,12 +47,6 @@ data Subst (X : VarSet) where
   repl : ∀{n n' n'' u}{Γ' : Cxt n'}{Γ'' : Cxt n''} → (Γ : Cxt n) → (e : Exp X Γ' u) → 
                 Subst X Γ'' (Γ ++ u ∷ Γ') → Subst X Γ'' (Γ ++ Γ') 
 
-   
---data Val {n : ℕ} (X : VarSet) (Γ : Cxt n)  where
-   
---replaceV : ∀{s s' u t}{X : VarSet}{Γ' : Cxt s'} → (Γ : Cxt s) → 
---        Val X (Γ ++ u ∷ Γ') t → Exp X Γ' u → Val X (Γ ++ Γ') t
-
 sucVar : ∀{n n' u t}{Γ' : Cxt n'} → (Γ : Cxt n) → Var (Γ ++ Γ') t → Var (Γ ++ u ∷ Γ') t
 sucVar [] v = inj₂ v
 sucVar (x ∷ Γ) (inj₁ eq) = inj₁ eq
@@ -72,13 +54,6 @@ sucVar (x ∷ Γ) (inj₂ y) = inj₂ (sucVar Γ y)
 
 sucExp : ∀{s s' u t}{X : VarSet}{Γ' : Cxt s'} → (Γ : Cxt s) → 
           Exp X (Γ ++ Γ') t → Exp X (Γ ++ u ∷ Γ') t
-
---sucVal : ∀{s s' u t}{X : VarSet}{Γ' : Cxt s'} → (Γ : Cxt s) → 
---          Val X (Γ ++ Γ') t → Val X (Γ ++ u ∷ Γ') t
-
---sucVal Γ unit = unit
---sucVal Γ (inL e) = inL (sucExp Γ e)
---sucVal Γ (inR e) = inR (sucExp Γ e)
 
 sucExp Γ (unit) = unit
 sucExp Γ (inL a) =  inL (sucExp Γ a)
@@ -101,9 +76,6 @@ replace [] (var (inj₂ y)) e' = var y
 replace (t ∷ Γ) (var (inj₁ eq)) e' = var (inj₁ eq)
 replace (x ∷ Γ) (var (inj₂ v)) e'  = sucExp [] (replace Γ (var v) e')
 replace Γ (fvar x s) e' = fvar x (repl Γ e' s) 
-
---_>>=val_ : ∀{n t}{X Y : VarSet}{Γ : Cxt n} → Val X Γ t → 
---             (∀{m u}{Δ : Cxt m} → X Δ u → Exp Y Δ u) → Val Y Γ t
 
 _⇀ₛ_ : VarSet → VarSet → Set
 X ⇀ₛ Y = (∀{m u}{Δ : Cxt m} → X Δ u → Exp Y Δ u)
@@ -147,22 +119,3 @@ lift-replace (x ∷ Γ) σ (var (inj₁ eq)) e' = refl
 lift-replace (x ∷ Γ) σ (var (inj₂ v)) e' = trans (lift-sucExp [] σ (replace Γ (var v) e')) 
                                                  (cong (sucExp []) (lift-replace Γ σ (var v) e'))  
 lift-replace Γ σ (fvar x s) e' = refl
-
-
-
--- (subs {!Γ!} {!!} {!s!}) -- fvar {!!} x (subs {!Γ!} {!!} {!s!}) -- fvar x {!!}
---replace [] (weak e) e' = {!!}
---replace (x ∷ Γ) (weak e) e' = {!!}
-
---replaceStruct [] (exchange u₁ u) e e' = {!!}
---replaceStruct [] (lift st) e e' = {!!}
---replaceStruct (x ∷ Γ) st e e' = {!!}
-
-
---replaceV Γ unit e' = unit
---replaceV Γ (inL e) e' = inL (replace Γ e e')
---replaceV Γ (inR e) e' = inR (replace Γ e e')
-
-
---_⟨_⟩ : ∀{s u t}{X : VarSet}{Γ : Cxt s} → Exp X (u ∷ Γ) t → Exp X Γ u → Exp X Γ t
---_⟨_⟩ = {!!}
