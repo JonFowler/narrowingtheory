@@ -60,7 +60,7 @@ ValE (app e e₁) = ⊥
 ValE (lam e) = ⊤
 ValE (fix e) = ⊥
 
---data _⇒_ {V : ℕ}{Γ : Cxt V}{X : VarSet} {t : Ty} : Expr Γ X t → Expr Γ X t → Set where
+data _⇒_ {V : ℕ}{Γ : Cxt V}{X : VarSet} {t : Ty} : Expr Γ X t → Expr Γ X t → Set where
 
                
 -- Transistive closure
