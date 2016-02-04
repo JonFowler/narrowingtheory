@@ -8,6 +8,20 @@ open import Data.Product
 open import Relation.Binary.PropositionalEquality
 open import Data.Empty
 open import Data.Sum
+open import Data.Unit
+open import Function
+open import Coinduction
+
+--data FinSet : Set where
+--  ∅ : FinSet
+--  one : FinSet
+--  _⊕_ : FinSet → FinSet → FinSet
+--  
+--data FinVar : FinSet → Set where
+--  here : FinVar one
+--  inL : {X Y : FinSet} → FinVar X → FinVar (X ⊕ Y)
+--  inR : {X Y : FinSet} → FinVar Y → FinVar (X ⊕ Y)
+ 
 
 data _⇒R_ {X : VarSet}{n : ℕ}{Γ : Cxt n}{t : Type} : 
           Exp X Γ t → Exp X Γ t → Set where
@@ -24,3 +38,12 @@ data _⇒_ {X : VarSet}{n : ℕ}{Γ : Cxt n}{t : Type} :
 
                      
 
+data narrSet {n : ℕ}{Γ : Cxt n} : {t : Type}{X : VarSet} → (Exp X Γ t) → Set₁ where
+   inL : ∀{t u}(x : Unit) → narrSet (inL {t = t}{u} (fvar [] x))
+   inR : ∀{t u}(x : Unit) → narrSet (inR {t = t}{u} (fvar [] x ))
+   var : ∀{t}{X : VarSet}(v : Var Γ t) → narrSet {X = X} (var v)
+   case : ∀{t u v}{X : VarSet}{e : Exp X Γ (u ⊕ v)} →  narrSet e →  
+                               narrSet {t = t}{X = λ Γ t → X Γ t ⊎ (Unit ⊎ Unit)} 
+                                       (case (e >>=ₛ (λ x → fvar [] (inj₁ x))) 
+                                       (fvar [] (inj₂ (inj₁ unit)))
+                                       (fvar [] (inj₂ (inj₂ unit))))

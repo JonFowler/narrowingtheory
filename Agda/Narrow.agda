@@ -3,6 +3,7 @@ module Narrow where
 open import Data.Product
 open import Data.Sum
 open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.Core
 open import Category.Monad
 open import Data.Nat
 open import Function
@@ -32,7 +33,9 @@ record IMonad (I : Set) (M : (I → Set) → (I → Set)) : Set₁ where
      >>=-assoc : ∀{X Y Z i} → (m : M X i) → (f : ∀{j} → X j → M Y j) → 
                                               (g : ∀{j} → Y j → M Z j)
                      → g =<< f =<< m ≡  (λ a → g =<< f a) =<< m
- 
+                     
+--data Eq {A : Set}(R : A → A → Set) : Set₁ where
+  
                      
 module Expression 
                   (T : Set)
@@ -89,16 +92,16 @@ module Expression
   data Terminates {t : T}{X : T → Set} (e : E X t) : Set where
     term : (∀{e'} → e ↦ e' → Terminates e') → Terminates e
     
-  data Infinite {t : T}{X : T → Set} (e : E X t) : Set where
-    inf : ∀{e'} → e ↦ e' → (∀{e''} → e ↦ e'' → ∞ (Infinite e'')) → Infinite e
+  data Diverges {t : T}{X : T → Set} (e : E X t) : Set where
+    diverge : ∀{e'} → e ↦ e' → (∀{e''} → e ↦ e'' → ∞ (Diverges e'')) → Diverges e
     
 
-  infRetract : ∀{t}{X : T → Set}{e e' : E X t} → e ↦* e' → Infinite e → Infinite e'
+  infRetract : ∀{t}{X : T → Set}{e e' : E X t} → e ↦* e' → Diverges e → Diverges e'
   infRetract [] i = i
-  infRetract (x :↦: r) (inf r' fω) = infRetract r (♭ (fω x))
+  infRetract (x :↦: r) (diverge r' fω) = infRetract r (♭ (fω x))
 
-  pickInf : ∀{t}{X : T → Set}{e : E X t} → Infinite e → e ↦ω 
-  pickInf (inf r fω) = r :↦: ♯ (pickInf (♭ (fω r)))
+  pickInf : ∀{t}{X : T → Set}{e : E X t} → Diverges e → e ↦ω 
+  pickInf (diverge r fω) = r :↦: ♯ (pickInf (♭ (fω r)))
     
 --  test : ∀{X}{e e' : E X} → ¬ (¬ Terminates e) → e ↦ e' → ¬ (¬ Terminates e')
 --  test f r = λ x → f (λ {(term f') → x (f' r)})
@@ -108,22 +111,33 @@ module Expression
   noinf : ∀{t}{X : T → Set}{e : E X t} → Terminates e → ¬ (e ↦ω)
   noinf (term x) (r :↦: rω) = noinf (x r) (♭ rω)
   
-  noterm : ∀{t}{X : T → Set}{e e' : E X t} → Infinite e → ¬ (e ↦! e')
-  noterm (inf r rω) ([] , t) = t r
-  noterm (inf r rω) (x :↦: r* , t) = noterm (♭ (rω x)) (r* , t) 
+  noterm : ∀{t}{X : T → Set}{e e' : E X t} → Diverges e → ¬ (e ↦! e')
+  noterm (diverge r rω) ([] , t) = t r
+  noterm (diverge r rω) (x :↦: r* , t) = noterm (♭ (rω x)) (r* , t) 
   --        
   NarrSet :  Set₁
   NarrSet = {t : T} → {X Y : T → Set} → (e : E X t) → (σ : X ⇀ Y) → Set
   
   ∅ : T → Set
   ∅ _ = ⊥
+  
+  ExpR : Set₁
+  ExpR =  ∀{Y t} → E Y t → E Y t → Set
+  
+  SubR : Set₁
+  SubR = ∀{X Y} → X ⇀ Y → X ⇀ Y → Set
+
+  SubRel : ExpR → SubR
+  SubRel R {X} σ σ' = (t : T) → (x : X t) → R (σ x) (σ' x)
 
   module Semantics 
     (↦lift : ∀{X Y t}{e e' : E X t} → e ↦ e' → (σ : X ⇀ Y) → e ⟦ σ ⟧  ↦ e' ⟦ σ ⟧ )
     (↦confluent : ∀{X t}{e e₁ e₂ : E X t} → 
                 e ↦* e₁ → e ↦* e₂ → Σ (E X t) (λ e' → e₁ ↦* e' × e₂ ↦* e'))
     (↦terminates : ∀{X t}{e e' : E X t} → (r : e ↦! e') → Terminates e)
-    (↦infinite : ∀{X t}{e : E X t} → (r : e ↦ω) → Infinite e)
+    (↦infinite : ∀{X t}{e : E X t} → (r : e ↦ω) → Diverges e)
+    (_≃_ : ∀{X t} → (e : E X t) → (e' : E X t) → Set)
+    (equiv : ∀{X t} → IsEquivalence (_≃_ {X}{t}))
     (narrSet : NarrSet)
     (⇝set : ∀{X Y t} → (e : E X t) → (τ : X ⇀ Y) → 
             (({e' : E Y t} → ¬ (e ⟦ τ ⟧ ↦ e')) ⊎
@@ -201,10 +215,10 @@ module Expression
     
     
     divergenceComplete'  : {t : T}{X Y : T → Set}{e : E X t} → (τ : X ⇀ Y) → 
-                                          e ⟦ τ ⟧ ↦ω → (Infinite (e ⟦ τ ⟧)) → e ⇝ω τ
+                                          e ⟦ τ ⟧ ↦ω → (Diverges (e ⟦ τ ⟧)) → e ⇝ω τ
     divergenceComplete' {e = e} τ (r :↦: rω) i with ⇝set e τ
     divergenceComplete' τ (r :↦: rω) i | inj₁ ¬reducible = ⊥-elim (¬reducible r)
-    divergenceComplete' ._ (r :↦: rω) (inf dt fω) | inj₂ (Y , σ , e' , o , (τ' , refl) , r') 
+    divergenceComplete' ._ (r :↦: rω) (diverge dt fω) | inj₂ (Y , σ , e' , o , (τ' , refl) , r') 
        = fred r' o :⇝: ♯ (divergenceComplete' τ' rω' (♭ (fω (↦lift-coerce r' τ'))))
            where rω' = lemma-divConfl (↦lift-coerce r' τ') (r :↦: rω)
     
