@@ -145,11 +145,17 @@ unifyVarBool v T = just (match (var v) nothing nothing (just (bool T)))
 
 unify : ∀{X} → Full X → Full X → Maybe (Full X)
 unifyMaybe : ∀{X} → Full X → Maybe (Full X) → Maybe (Full X)
+unifyMaybeMaybe : ∀{X} → Maybe (Full X) → Maybe (Full X) → Maybe (Full X)
 unifyVarMatch : ∀{X} → (v : Fin X) → Full X → (e e' e'' : Maybe (Full X)) → Maybe (Full X)
 unifyMatchSym : ∀{X} → Full X → Full X → (f f' f'' : Maybe (Full X)) → Maybe (Full X)
+--unifyMatchs : ∀{X} → Full X → (f f' f'' : Maybe (Full X)) → 
+--                      Full X → (g g' g'' : Maybe (Full X)) → Maybe (Full X)
 
 unifyMaybe e (just x) = unify e x
 unifyMaybe e nothing = nothing
+
+unifyMaybeMaybe nothing e = nothing
+unifyMaybeMaybe (just e) f = unifyMaybe e f
 
 unifyVarMatch v (var v') f f' f'' with v ≟ v'
 unifyVarMatch v (var .v) f f' f'' | yes refl = maybeMatch (var v) 
@@ -163,6 +169,17 @@ unifyMatchSym u e f f' f'' = maybeMatch e (unifyMaybe u f )
                                           (unifyMaybe u f') 
                                           (unifyMaybe u f'')
 
+--unifyMatchs (var v) f f' f'' (var v') g g' g'' with v ≟ v'
+--unifyMatchs (var v) f f' f'' (var .v) g g' g'' | yes refl = just (match (var v) 
+--           (unifyMaybeMaybe f g) 
+--           (unifyMaybeMaybe f' g') 
+--           (unifyMaybeMaybe f'' g''))
+--unifyMatchs (var v) f f' f'' (var v') g g' g'' | no ¬p = maybeMatch (var v') 
+--  (unifyMaybe (match (var v) f f' f'') g)
+--  ?
+--  ?
+--unifyMatchs e f f' f'' e' g g' g'' = {!!}
+
 unify (bool b) (bool b') = unifyBool b b'
 unify (bool b) (var v) = unifyVarBool v b 
 unify (bool b) (match e f f' f'') = unifyMatchSym (bool b) e f f' f'' 
@@ -175,7 +192,19 @@ unify (var v) (var v₁) | no ¬p = just (match (var v) nothing (just vF) (just 
 unify (var v) (match e' x x₁ x₂) = unifyVarMatch v e' x x₁ x₂
 unify (match e f f' f'') (bool b) = unifyMatchSym (bool b) e f f' f''
 unify (match e f f' f'') (var v) = unifyVarMatch v e f f' f'' 
-unify (match e f f' f'') (match e' g g' g'') = {!!}
+unify (match (var v) f f' f'') (match (var v') g g' g'') with v ≟ v'
+unify (match (var v) f f' f'') (match (var .v) g g' g'') | yes refl = just (match (var v) 
+           (unifyMaybeMaybe f g) 
+           (unifyMaybeMaybe f' g') 
+           (unifyMaybeMaybe f'' g''))
+unify (match (var v) f f' f'') (match (var v') g g' g'') | no ¬p = maybeMatch (var v') 
+  (unifyMaybe (match (var v) f f' f'') g) 
+  (unifyMaybe (match (var v) f f' f'') g') 
+  (unifyMaybe (match (var v) f f' f'') g'') 
+unify (match e f f' f'') (match e' g g' g'') = maybeMatch e' 
+  (unifyMaybe (match e f f' f'') g) 
+  (unifyMaybe (match e f f' f'') g')
+  (unifyMaybe (match e f f' f'') g'')
 
 full : {X : ℕ} → Expr X → Full X
 full (bool b) = bool b
