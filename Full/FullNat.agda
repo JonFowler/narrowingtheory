@@ -12,17 +12,28 @@ open import Relation.Nullary
 
 data Ty : Set where
   Nat : Ty
---  _→ₜ_ : Ty → Ty → Ty
+  _→ₜ_ : Ty → Ty → Ty
 
 Cxt : ℕ → Set
 Cxt = Vec Ty
+
 
 data Expr {V : ℕ} (Γ : Cxt V) : Ty → Set where
   Z : Expr Γ Nat 
   S : Expr Γ Nat → Expr Γ Nat 
   bot : ∀{t} → Expr Γ t
-  case : ∀{t} → (e : Expr Γ Nat) → (e' : Expr Γ t) → (e'' : Expr (Nat ∷ Γ) t) → Expr Γ t
+  ƛ : ∀{u t} → (e : Expr (u ∷ Γ) t) → Expr Γ (u →ₜ t)
+  case : ∀{t} → (e : Expr Γ Nat) → (e' : Expr Γ t) → (e'' : Expr Γ (Nat →ₜ t)) → Expr Γ t
+
   var : ∀{t} → (v : Fin V) → Γ [ v ]= t → Expr Γ t
+  app : ∀{u t} → Expr Γ (u →ₜ t) → Expr Γ u → Expr Γ t
+
+data Val {V : ℕ} (Γ : Cxt V) : Ty → Set where
+  Z : Val Γ Nat 
+  S : Expr Γ Nat → Val Γ Nat 
+  bot : ∀{t} → Val Γ t
+  ƛ : ∀{u t} → (e : Expr (u ∷ Γ) t) → Val Γ (u →ₜ t)
+ 
 
 Inp : {V : ℕ} → Cxt V → Set
 Inp [] = ⊤
@@ -43,11 +54,93 @@ sucExpr : ∀{V V' t u}{Γ' : Cxt V'} → (Γ : Cxt V) → Expr (Γ ++ Γ') t �
 sucExpr Γ Z = Z
 sucExpr Γ (S x) = S (sucExpr Γ x)
 sucExpr Γ bot = bot 
+sucExpr Γ (ƛ {u = u} e) = ƛ (sucExpr (u ∷ Γ) e)
 sucExpr {V = V} Γ (var x o) = var (sucVar V x) (sucCxt Γ x o)
-sucExpr Γ (case e e₁ e₂) = case (sucExpr Γ e) (sucExpr Γ e₁) (sucExpr (Nat ∷ Γ) e₂)
+sucExpr Γ (case e e₁ e₂) = case (sucExpr Γ e) (sucExpr Γ e₁) (sucExpr Γ e₂)
+sucExpr Γ (app e e₁) = app (sucExpr Γ e) (sucExpr Γ e₁)
+
+substExpr : ∀{V V' t u}{Γ' : Cxt V'}(Γ : Cxt V) → Expr (Γ ++ u ∷ Γ') t → Expr Γ' u → Expr (Γ ++ Γ') t
+substExpr Γ Z ef = Z
+substExpr Γ (S x) ef = S (substExpr Γ x ef)
+substExpr Γ bot ef = bot
+substExpr Γ (ƛ {u = u} e) ef = ƛ (substExpr (u ∷ Γ) e ef)
+substExpr [] (var zero here) ef = ef 
+substExpr [] (var (suc v) (there o)) ef = var v o
+substExpr (x ∷ Γ) (var zero here) ef = var zero here
+substExpr (x ∷ Γ) (var (suc v) (there o)) ef = sucExpr [] (substExpr Γ (var v o) ef )
+substExpr Γ (case e e₁ e₂) ef = case (substExpr Γ e ef) (substExpr Γ e₁ ef) (substExpr Γ e₂ ef)
+substExpr Γ (app e e₁) ef = app (substExpr Γ e ef) (substExpr Γ e₁ ef)
+
+_⟪_⟫ : ∀{V u t}{Γ : Cxt V} → Expr (u ∷ Γ) t → Expr Γ u → Expr Γ t
+_⟪_⟫ = substExpr [] 
+
+data _↦_ {t : Ty} : Expr [] t → Expr [] t → Set where
+  caseSubj : ∀{e e'} → e ↦ e' → ∀{e₁ e₂}  
+           → case e e₁ e₂ ↦ case e' e₁ e₂
+  caseZ : ∀{e₁ e₂} → case Z e₁ e₂ ↦ e₁
+  caseS : ∀{eₛ e₁ e₂} → case (S eₛ) e₁ e₂ ↦ app e₂ eₛ
+  casebot : ∀{e₁ e₂} → case bot e₁ e₂ ↦ bot
+  appL : ∀{u}{e e' : Expr [] (u →ₜ t)} → e ↦ e' → ∀{e''}  
+           → app e e'' ↦ app e' e'' 
+  app : ∀{u}{e : Expr [ u ] t}{e' : Expr [] u} → app (ƛ e) e' ↦ e ⟪ e' ⟫
+  
+data _⇓ₑ_ : {t : Ty} → Expr [] t → Val [] t → Set where
+  Z : Z ⇓ₑ Z
+  S : ∀{e} → S e ⇓ₑ S e
+  bot : ∀{t} → _⇓ₑ_ {t = t} bot bot
+  ƛ : ∀{u t}{e : Expr [ u ] t} → ƛ e ⇓ₑ ƛ e
+  red : ∀{t e e' e''} → _↦_ {t = t} e e' → e' ⇓ₑ e'' → e ⇓ₑ e''
+
+_⇓ : ∀{t} → Expr [] t → Set
+e ⇓ = ∃ (λ v → e ⇓ₑ v)
+  
+
+WN' : (t : Ty) → Expr [] t → Set
+WN : ∀{t} → Expr [] t → Set
+
+WN {t} e = e ⇓ × WN' t e
+
+WN' Nat e = ⊤
+WN' (t₁ →ₜ t₂) e = (e' : Expr [] t₁) → WN e' → WN (app e e')
 
 
---subst :
+--WNtoEval : ∀{t V}{Γ : Cxt V}{e : Expr Γ t} →  WN e → e ⇓
+--WNtoEval (d , proj₂) = d
+
+apply : ∀{V t}{Γ : Cxt V} → Expr Γ t → Inp Γ → Expr [] t
+apply {Γ = []} e s = e
+apply {Γ = x ∷ Γ} e (e' , s) = apply (e ⟪ e' ⟫) s
+
+createWN : ∀{V t}{Γ : Cxt V} → (e : Expr Γ t) → (s : Inp Γ) → WN (apply e s)
+createWN {Γ = []} Z tt = (Z , Z) , tt
+createWN {Γ = x ∷ Γ} Z (e' , s) = createWN Z s
+createWN {Γ = []} (S e) s = (S e , S) , tt
+createWN {Γ = x ∷ Γ} (S e) (e' , s) with createWN (S (e ⟪ e' ⟫)) s
+createWN {._} {.Nat} {x ∷ Γ} (S e) (e' , s) | (proj₁ , proj₂) , proj₃ = ({!!} , {!!}) , {!!} -- (S (apply e (e' , s)) , {!!}) , {!!}
+createWN bot s = {!!}
+createWN (ƛ e) s = {!!}
+createWN (case e e₁ e₂) s = {!!}
+createWN (var v x) s = {!!}
+createWN (app e e₁) s = {!!}
+--createWN Z = (Z , Z) , tt
+--createWN (S e) = (S e , S) , tt
+--createWN {Nat} bot = (bot , bot) , tt
+--createWN {t →ₜ t₁} bot = (bot , bot) , (λ e' x → createWN (app bot e'))  
+--createWN (ƛ e) = (ƛ e , ƛ) , (λ e' x → createWN (app (ƛ e) e'))
+--createWN (case e e₁ e₂) = {!!}
+--createWN (var () x)
+--createWN (app e e₁) with createWN e
+--...| c  = {!!} 
+
+--evalExpr : ∀{t V}{Γ : Cxt V} → (e : Expr Γ t) → Val Γ t
+--evalExpr Z wn = Z
+--evalExpr (S e) wn = S e 
+--evalExpr bot wn = bot
+--evalExpr (case e e₁ e₂) wn with evalExpr e ? 
+--evalExpr (case e e₁ e₂) wn | Z = evalExpr e₁ ? 
+--evalExpr (case e e₁ e₂) wn | S c = evalExpr (e₂ ⟪ c ⟫) ?
+--evalExpr (case e e₁ e₂) wn | bot = bot
+--evalExpr (var v o) wn = bot
 
 --data Full (X : ℕ) : Set where
 --  val : B → Full X
