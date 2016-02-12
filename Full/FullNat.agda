@@ -10,6 +10,7 @@ open import Data.Empty
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Data.Product
 open import Relation.Nullary
+open import Helpful
 
 data Ty : Set where
   Nat : Ty
@@ -44,9 +45,6 @@ data Inp : Cxt → Set where
   [] : Inp ε 
   _,_ : ∀{t Γ} → Inp Γ → Term Γ t → Inp (Γ , t)
 
-
-
-
 Ren : Cxt → Cxt → Set
 Ren Γ Γ′ = ∀ {τ} → τ ∈ Γ → τ ∈ Γ′
 
@@ -67,7 +65,7 @@ r *' app e e₁ = app (r *' e) (r *' e₁)
 Sub : Cxt → Cxt → Set
 Sub Γ Γ′ = ∀ {τ} → τ ∈ Γ → Term Γ′ τ
 
-extend : ∀ {Γ Γ′ τ} → Sub Γ Γ′ → Sub (Γ , τ) (Γ′ , τ)
+extend : ∀ {Γ Γ′ t} → Sub Γ Γ′ → Sub (Γ , t) (Γ′ , t)
 extend θ here = var here
 extend θ (there x) = there *' θ x
 
@@ -132,19 +130,28 @@ subInp [] ()
 subInp (es , e) here = subInp es * e
 subInp (es , e) (there v) = subInp es v
 
+SubRefl : ∀{Γ} → Sub Γ Γ → Set
+SubRefl {Γ} f = ∀ {t} → (v : t ∈ Γ) → f v ≡ var v
+
+extendRef : ∀{Γ t}{f : Sub Γ Γ} → 
+          SubRefl f → SubRefl (extend {t = t} f)
+extendRef eq here = refl
+extendRef eq (there v) = cong (λ x → there *' x) (eq v)
+
+
+
 WNInp : ∀{Γ} → Inp Γ → Set
 WNInp [] = ⊤
 WNInp (es , e) = WNInp es × WN e
 
-
-subInp-refl : ∀{t} → (e : Term ε t) → subInp [] * e ≡ e
-subInp-refl Z = refl
-subInp-refl (S e) = cong S (subInp-refl e)
-subInp-refl bot = refl
-subInp-refl (ƛ e) = cong ƛ {!!}
-subInp-refl (case e e₁ e₂) = {!!}
-subInp-refl (var v) = {!!}
-subInp-refl (app e e₁) = {!!}
+sub-refl : ∀{Γ t} → (e : Term Γ t) → (f : Sub Γ Γ) → SubRefl f → f * e ≡ e
+sub-refl Z f r = refl
+sub-refl (S e) f r = cong S (sub-refl e f r)
+sub-refl bot f r = refl
+sub-refl (ƛ e) f r = cong ƛ (sub-refl e (extend f) (extendRef r))
+sub-refl (case e e₁ e₂) f r = {!!}
+sub-refl (var v) f r = {!!}
+sub-refl (app e e₁) f r = {!!}
 
 apply : ∀{t Γ} → Term Γ t → Inp Γ → Term ε t
 apply e es = subInp es * e 
