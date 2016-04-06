@@ -1,16 +1,12 @@
 module FullNat where
 
-open import Coinduction
 open import Data.Nat hiding (_≟_) hiding (_*_)
 open import Data.Fin hiding (_+_) 
---open import Data.Vec hiding (_>>=_) 
---open import Data.Maybe
 open import Data.Unit hiding (_≟_)
 open import Data.Empty
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Data.Product
 open import Relation.Nullary
-open import Helpful
 
 data Ty : Set where
   Nat : Ty
@@ -37,7 +33,7 @@ data Term (Γ : Cxt) : Ty → Set where
 
 data Val (Γ : Cxt) : Ty → Set where
   Z : Val Γ Nat 
-  S : ∞ (Val Γ Nat) → Val Γ Nat 
+  S : (Val Γ Nat) → Val Γ Nat 
   bot : ∀{t} → Val Γ t
   ƛ : ∀{u t} → (e : Term (Γ , u) t) → Val Γ (u →ₜ t)
  
@@ -85,9 +81,6 @@ sub e (there v) = var v
 _⟨_⟩ : ∀{Γ u t} → Term (Γ , u) t → Term Γ u → Term Γ t 
 f ⟨ e ⟩ = sub e * f
 
---_⟪_⟫ : ∀{V u t}{Γ : Cxt V} → Term (u ∷ Γ) t → Term Γ u → Term Γ t
---_⟪_⟫ = substTerm [] 
---
 data _↦_ {Γ : Cxt}{t : Ty} : Term Γ t → Term Γ t → Set where
   caseSubj : ∀{e e'} → e ↦ e' → ∀{e₁ e₂}  
            → case e e₁ e₂ ↦ case e' e₁ e₂
@@ -100,14 +93,14 @@ data _↦_ {Γ : Cxt}{t : Ty} : Term Γ t → Term Γ t → Set where
   
 data _⇓ {Γ : Cxt} : {t : Ty} → Term Γ t → Set where
   Z : Z ⇓ 
-  S : ∀{e} → ∞ (e ⇓) → S e ⇓
+  S : ∀{e} → (e ⇓) → S e ⇓
   bot : ∀{t} → _⇓ {t = t} bot 
   ƛ : ∀{u t}{e : Term (Γ , u) t} → ƛ e ⇓ 
   red : ∀{t e e'} → _↦_ {t = t} e e' → e' ⇓ → e ⇓ 
   
 evalVal : ∀{Γ t} {e : Term Γ t} → e ⇓ → Val Γ t
 evalVal Z = Z
-evalVal (S x) = S (♯ evalVal (♭ x))
+evalVal (S x) = S (evalVal x)
 evalVal bot = bot
 evalVal {e = ƛ e} ƛ = ƛ e
 evalVal (red x re) = evalVal re
@@ -140,34 +133,34 @@ extendRef eq (there v) = cong (λ x → there *' x) (eq v)
 
 
 
-WNInp : ∀{Γ} → Inp Γ → Set
-WNInp [] = ⊤
-WNInp (es , e) = WNInp es × WN e
-
-sub-refl : ∀{Γ t} → (e : Term Γ t) → (f : Sub Γ Γ) → SubRefl f → f * e ≡ e
-sub-refl Z f r = refl
-sub-refl (S e) f r = cong S (sub-refl e f r)
-sub-refl bot f r = refl
-sub-refl (ƛ e) f r = cong ƛ (sub-refl e (extend f) (extendRef r))
-sub-refl (case e e₁ e₂) f r = {!!}
-sub-refl (var v) f r = {!!}
-sub-refl (app e e₁) f r = {!!}
-
-apply : ∀{t Γ} → Term Γ t → Inp Γ → Term ε t
-apply e es = subInp es * e 
-
---test : ∀{Γ} (e : Term Γ Nat) → e ⇓ → S e ⇓
---test e (v , r) = S {!!} , S (♯ r) -- S {!!} -- {!!} , {!!}
-
-createWN : ∀{t Γ} → (e : Term Γ t) → (s : Inp Γ) → WN (apply e s)
-createWN Z s = Z , tt
-createWN (S e) s = (S (♯ proj₁ (createWN e s))) , tt 
-createWN {t = Nat} bot s = bot , tt
-createWN {t = t₁ →ₜ t₂} bot s = bot , (λ e' x → createWN (app bot {!e'!}) [])
-createWN (ƛ e) s = {!!}
-createWN (case e e₁ e₂) s = {!!}
-createWN (var v) s = {!!}
-createWN (app e e₁) s = {!!}
+--WNInp : ∀{Γ} → Inp Γ → Set
+--WNInp [] = ⊤
+--WNInp (es , e) = WNInp es × WN e
+--
+--sub-refl : ∀{Γ t} → (e : Term Γ t) → (f : Sub Γ Γ) → SubRefl f → f * e ≡ e
+--sub-refl Z f r = refl
+--sub-refl (S e) f r = cong S (sub-refl e f r)
+--sub-refl bot f r = refl
+--sub-refl (ƛ e) f r = cong ƛ (sub-refl e (extend f) (extendRef r))
+--sub-refl (case e e₁ e₂) f r = {!!}
+--sub-refl (var v) f r = {!!}
+--sub-refl (app e e₁) f r = {!!}
+--
+--apply : ∀{t Γ} → Term Γ t → Inp Γ → Term ε t
+--apply e es = subInp es * e 
+--
+----test : ∀{Γ} (e : Term Γ Nat) → e ⇓ → S e ⇓
+----test e (v , r) = S {!!} , S (♯ r) -- S {!!} -- {!!} , {!!}
+--
+--createWN : ∀{t Γ} → (e : Term Γ t) → (s : Inp Γ) → WN (apply e s)
+--createWN Z s = Z , tt
+--createWN (S e) s = (S (proj₁ (createWN e s))) , tt 
+--createWN {t = Nat} bot s = bot , tt
+--createWN {t = t₁ →ₜ t₂} bot s = bot , (λ e' x → createWN (app bot {!e'!}) [])
+--createWN (ƛ e) s = {!!}
+--createWN (case e e₁ e₂) s = {!!}
+--createWN (var v) s = {!!}
+--createWN (app e e₁) s = {!!}
 
 
 --createWN {Γ = []} Z tt = (Z , Z) , tt
